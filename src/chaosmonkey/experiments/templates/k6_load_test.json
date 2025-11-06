@@ -1,0 +1,44 @@
+{
+  "version": "1.0.0",
+  "title": "k6 Load Test",
+  "description": "Run k6 load testing to verify system performance under load",
+  "tags": ["load-test", "k6"],
+  "steady-state-hypothesis": {
+    "title": "System handles expected load",
+    "probes": [
+      {
+        "type": "probe",
+        "name": "check-service-response-time",
+        "provider": {
+          "type": "http",
+          "url": "${target_url}${health_endpoint}",
+          "method": "GET",
+          "timeout": 10
+        },
+        "tolerance": [200, 201, 202]
+      }
+    ]
+  },
+  "method": [
+    {
+      "type": "action",
+      "name": "run-k6-load-test",
+      "provider": {
+        "type": "python",
+        "module": "chaosmonkey.core.k6_runner",
+        "func": "run_k6_script",
+        "arguments": {
+          "script_text": "import http from 'k6/http';\nimport { check } from 'k6';\n\nexport default function() {\n  let response = http.get('${target_url}');\n  check(response, {\n    'status is 200': (r) => r.status === 200,\n    'response time < ${response_time_threshold}ms': (r) => r.timings.duration < ${response_time_threshold},\n  });\n}",
+          "options": {
+            "vus": "${virtual_users}",
+            "duration": "${duration_seconds}s",
+            "thresholds": {
+              "http_req_duration": ["p(95)<${response_time_threshold}"]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "rollbacks": []
+}

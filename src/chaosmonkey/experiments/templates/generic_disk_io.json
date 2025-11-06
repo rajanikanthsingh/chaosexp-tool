@@ -1,0 +1,28 @@
+{
+  "version": "1.0.0",
+  "title": "Disk I/O stress template",
+  "description": "Experiment that creates heavy disk I/O load on the target node to test resilience under disk pressure.",
+  "tags": ["disk-io", "io-stress"],
+  "steady-state-hypothesis": {
+    "title": "Service I/O performance remains acceptable",
+    "probes": []
+  },
+  "method": [
+    {
+      "type": "action",
+      "name": "Stress disk I/O",
+      "provider": {
+        "type": "python",
+        "module": "chaosmonkey.stubs.actions",
+        "func": "run_disk_io_stress",
+        "arguments": {
+          "service_id": "${target_id}",
+          "duration": "${duration_seconds}",
+          "io_workers": "${io_workers}",
+          "write_size_mb": "${write_size_mb}"
+        }
+      }
+    }
+  ],
+  "rollbacks": []
+}

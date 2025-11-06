@@ -1,0 +1,27 @@
+{
+  "version": "1.0.0",
+  "title": "Network latency template",
+  "description": "Placeholder experiment introducing artificial latency via Nomad job.",
+  "tags": ["network-latency"],
+  "steady-state-hypothesis": {
+    "title": "Service latency remains within thresholds",
+    "probes": []
+  },
+  "method": [
+    {
+      "type": "action",
+      "name": "Inject latency",
+      "provider": {
+        "type": "python",
+        "module": "chaosmonkey.stubs.actions",
+        "func": "inject_latency",
+        "arguments": {
+          "service_id": "${target_id}",
+          "latency_ms": "${latency_ms}",
+          "duration": "${duration_seconds}"
+        }
+      }
+    }
+  ],
+  "rollbacks": []
+}

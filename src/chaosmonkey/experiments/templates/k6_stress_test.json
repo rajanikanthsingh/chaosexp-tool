@@ -1,0 +1,31 @@
+{
+  "version": "1.0.0",
+  "title": "k6 Stress Test",
+  "description": "Run k6 stress testing to find system breaking point",
+  "tags": ["stress-test", "k6"],
+  "steady-state-hypothesis": {
+    "title": "System degrades gracefully under stress",
+    "probes": []
+  },
+  "method": [
+    {
+      "type": "action",
+      "name": "run-k6-stress-test",
+      "provider": {
+        "type": "python",
+        "module": "chaosmonkey.stubs.actions",
+        "func": "run_k6_script",
+        "arguments": {
+          "script_text": "import http from 'k6/http';\nimport { check } from 'k6';\n\nexport let options = {\n  stages: [\n    { duration: '2m', target: ${ramp_up_users} },\n    { duration: '5m', target: ${max_users} },\n    { duration: '2m', target: 0 },\n  ],\n};\n\nexport default function() {\n  let response = http.get('${target_url}');\n  check(response, {\n    'status is not 5xx': (r) => r.status < 500,\n  });\n}",
+          "options": {
+            "thresholds": {
+              "http_req_failed": ["rate<0.5"],
+              "http_req_duration": ["p(95)<${stress_response_threshold}"]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "rollbacks": []
+}

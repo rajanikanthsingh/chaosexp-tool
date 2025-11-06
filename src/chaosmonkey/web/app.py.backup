@@ -1,0 +1,1258 @@
+"""Flask web application for ChaosMonkey UI."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from flask import Flask, jsonify, render_template, request, send_from_directory
+from flask_cors import CORS
+
+from .cache import get_cache, invalidate_cache
+
+app = Flask(__name__, 
+            template_folder=str(Path(__file__).parent / "templates"),
+            static_folder=str(Path(__file__).parent / "static"))
+CORS(app)
+
+# Get the workspace root
+WORKSPACE_ROOT = Path(__file__).parent.parent.parent.parent  # Fixed: 4 parents, not 5
+REPORTS_DIR = WORKSPACE_ROOT / "reports"
+REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+
+# Node operations tracking
+NODE_OPS_DIR = WORKSPACE_ROOT / "node_operations"
+NODE_OPS_DIR.mkdir(parents=True, exist_ok=True)
+
+# Initialize cache
+cache = get_cache()
+
+
+def log_node_operation(operation_type: str, node_id: str, node_name: str, details: Dict[str, Any] = None, batch_id: str = None) -> str:
+    """Log a node operation (drain/recover) for reporting."""
+    from datetime import datetime, UTC
+    import uuid
+    
+    operation_id = f"node-op-{uuid.uuid4().hex[:8]}"
+    timestamp = datetime.now(UTC).isoformat()
+    
+    operation_data = {
+        "operation_id": operation_id,
+        "type": operation_type,  # 'drain' or 'recover'
+        "node_id": node_id,
+        "node_name": node_name,
+        "timestamp": timestamp,
+        "details": details or {},
+        "success": details.get("success", True) if details else True,
+        "batch_id": batch_id  # Link to batch operation if this is part of a batch
+    }
+    
+    # Save to file
+    operation_file = NODE_OPS_DIR / f"{operation_id}.json"
+    with open(operation_file, 'w') as f:
+        json.dump(operation_data, f, indent=2)
+    
+    return operation_id
+
+
+def log_batch_node_operation(operation_type: str, nodes: List[Dict[str, Any]], details: Dict[str, Any] = None) -> str:
+    """Log a batch node operation (multiple nodes drained/recovered together)."""
+    from datetime import datetime, UTC
+    import uuid
+    
+    batch_id = f"batch-op-{uuid.uuid4().hex[:8]}"
+    timestamp = datetime.now(UTC).isoformat()
+    
+    batch_data = {
+        "operation_id": batch_id,
+        "type": operation_type,  # 'drain' or 'recover'
+        "is_batch": True,
+        "node_count": len(nodes),
+        "nodes": nodes,  # List of {node_id, node_name, success}
+        "timestamp": timestamp,
+        "details": details or {},
+        "success": all(n.get("success", True) for n in nodes),
+        "success_count": sum(1 for n in nodes if n.get("success", True)),
+        "failed_count": sum(1 for n in nodes if not n.get("success", True))
+    }
+    
+    # Save to file
+    operation_file = NODE_OPS_DIR / f"{batch_id}.json"
+    with open(operation_file, 'w') as f:
+        json.dump(batch_data, f, indent=2)
+    
+    return batch_id
+
+
+def get_node_operations(operation_type: Optional[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
+    """Get logged node operations, optionally filtered by type."""
+    operations = []
+    
+    for op_file in sorted(NODE_OPS_DIR.glob("node-op-*.json"), reverse=True):
+        try:
+            with open(op_file, 'r') as f:
+                op_data = json.load(f)
+                if operation_type is None or op_data.get("type") == operation_type:
+                    operations.append(op_data)
+                if len(operations) >= limit:
+                    break
+        except Exception as e:
+            print(f"Error loading operation file {op_file}: {e}")
+    
+    return operations
+
+
+def run_cli_command(command: List[str]) -> Dict[str, Any]:
+    """Execute a chaosmonkey CLI command and return the result."""
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            cwd=WORKSPACE_ROOT,
+            timeout=300  # 5 minute timeout
+        )
+        
+        # Try to parse JSON output
+        try:
+            output_data = json.loads(result.stdout) if result.stdout.strip() else {}
+        except json.JSONDecodeError:
+            output_data = {"raw_output": result.stdout}
+        
+        return {
+            "success": result.returncode == 0,
+            "output": output_data,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "returncode": result.returncode
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "success": False,
+            "error": "Command timed out after 5 minutes"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+@app.route("/")
+def index():
+    """Render the main dashboard."""
+    return render_template("index.html")
+
+
+@app.route("/api/discover/services")
+def discover_services():
+    """Discover Nomad services."""
+    result = run_cli_command(["chaosmonkey", "discover"])
+    return jsonify(result)
+
+
+@app.route("/api/discover/clients")
+def discover_clients():
+    """Discover Nomad client nodes using Nomad API with Redis caching."""
+    import os
+    from urllib.parse import urlparse
+    
+    # Check for refresh flag
+    force_refresh = request.args.get('refresh', 'false').lower() == 'true'
+    
+    # Try to get from cache first (unless force refresh)
+    cache_key = "nomad:clients:all"
+    if not force_refresh and cache.enabled:
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            print("✅ Returning cached Nomad clients")
+            return jsonify({
+                "success": True,
+                "output": {"clients": cached_data},
+                "cached": True
+            })
+    
+    try:
+        import nomad
+    except ImportError:
+        return jsonify({
+            "success": False,
+            "error": "python-nomad library not installed"
+        })
+    
+    try:
+        # Get Nomad connection from environment
+        addr = os.getenv("NOMAD_ADDR", "http://127.0.0.1:4646")
+        token = os.getenv("NOMAD_TOKEN", "")
+        parsed = urlparse(addr)
+        
+        client = nomad.Nomad(
+            host=parsed.hostname,
+            port=parsed.port or 4646,
+            token=token,
+            namespace=os.getenv("NOMAD_NAMESPACE", "default")
+        )
+        
+        # Get all nodes
+        nodes = client.nodes.get_nodes()
+        
+        # If we have cached data and not forcing refresh, do incremental update
+        existing_clients = {}
+        if not force_refresh and cache.enabled:
+            cached_hash = cache.get_all_hash("nomad:clients:hash")
+            if cached_hash:
+                existing_clients = cached_hash
+                print(f"📦 Found {len(existing_clients)} cached clients, doing incremental update")
+        
+        clients = []
+        updated_count = 0
+        new_count = 0
+        
+        for node in nodes:
+            node_id = node.get("ID", "")
+            node_name = node.get("Name", "unknown")
+            status = node.get("Status", "unknown")
+            datacenter = node.get("Datacenter", "unknown")
+            node_class = node.get("NodeClass", "-")
+            drain = node.get("Drain", False)
+            drain_strategy = node.get("DrainStrategy")
+            scheduling_eligibility = node.get("SchedulingEligibility", "eligible")
+            
+            # Determine drain display status
+            if drain_strategy:
+                drain_display = "Draining..."
+            elif drain or scheduling_eligibility == "ineligible":
+                drain_display = "Yes"
+            else:
+                drain_display = "No"
+            
+            # Check if we have this node cached and if basic info hasn't changed
+            cached_node = existing_clients.get(node_id)
+            if cached_node and not force_refresh:
+                # Check if status or drain changed (critical fields)
+                if (cached_node.get("status") == status and 
+                    cached_node.get("drain") == drain_display):
+                    # Use cached version
+                    clients.append(cached_node)
+                    continue
+            
+            # Need to fetch detailed info (new node or changed status)
+            try:
+                node_detail = client.node.get_node(node_id)
+                resources = node_detail.get("Resources", {})
+                node_resources = node_detail.get("NodeResources", {})
+                
+                cpu_mhz = resources.get("CPU", 0)
+                if not cpu_mhz and node_resources:
+                    cpu_info = node_resources.get("Cpu", {})
+                    cpu_mhz = cpu_info.get("CpuShares", 0)
+                
+                memory_mb = resources.get("MemoryMB", 0)
+                if not memory_mb and node_resources:
+                    mem_info = node_resources.get("Memory", {})
+                    memory_mb = mem_info.get("MemoryMB", 0)
+                
+                cpu_str = f"{cpu_mhz:,} MHz" if cpu_mhz else "-"
+                memory_gb = memory_mb / 1024 if memory_mb else 0
+                memory_str = f"{memory_gb:.1f} GB" if memory_mb else "-"
+                
+                node_allocs = client.node.get_allocations(node_id)
+                running_allocs = len([a for a in node_allocs if a.get("ClientStatus") == "running"])
+                
+                if cached_node:
+                    updated_count += 1
+                else:
+                    new_count += 1
+                    
+            except Exception as e:
+                print(f"⚠️  Error fetching details for node {node_id}: {e}")
+                # Use cached data if available, otherwise use defaults
+                if cached_node:
+                    clients.append(cached_node)
+                    continue
+                cpu_str = "-"
+                memory_str = "-"
+                running_allocs = 0
+            
+            node_data = {
+                "name": node_name,
+                "id": node_id,
+                "status": status,
+                "datacenter": datacenter,
+                "node_class": node_class or "-",
+                "cpu": cpu_str,
+                "memory": memory_str,
+                "drain": drain_display,
+                "allocations": str(running_allocs)
+            }
+            
+            clients.append(node_data)
+            
+            # Update hash cache for this node
+            if cache.enabled:
+                cache.set_hash("nomad:clients:hash", node_id, node_data)
+        
+        # Cache the full result for 60 seconds (fast queries)
+        if cache.enabled:
+            cache.set(cache_key, clients, ttl=60)
+            # Keep the hash cache for 5 minutes (for incremental updates)
+            cache.expire("nomad:clients:hash", 300)
+            
+            print(f"💾 Cached {len(clients)} clients (new: {new_count}, updated: {updated_count})")
+        
+        return jsonify({
+            "success": True,
+            "output": {
+                "clients": clients,
+                "stats": {
+                    "total": len(clients),
+                    "new": new_count,
+                    "updated": updated_count,
+                    "cached": len(clients) - new_count - updated_count
+                }
+            },
+            "cached": False
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        })
+
+
+@app.route("/api/discover/dora")
+def discover_dora():
+    """Discover VMs from Dora API."""
+    try:
+        from chaosmonkey.platforms.dora import DoraClient
+        from chaosmonkey.config import load_settings
+        
+        environment = request.args.get('environment', 'Dev')
+        debug = request.args.get('debug', 'false').lower() == 'true'
+        
+        # Load settings
+        settings = load_settings(None)
+        
+        # Create Dora client
+        client = DoraClient(
+            dora_host=settings.platforms.dora.host,
+            api_port=settings.platforms.dora.api_port,
+            auth_port=settings.platforms.dora.auth_port
+        )
+        
+        # Get credentials
+        username = settings.platforms.dora.username
+        password = settings.platforms.dora.password
+        
+        # Fetch environment data
+        data = client.get_environment_data(
+            environment=environment,
+            username=username,
+            password=password
+        )
+        
+        # Debug mode: return raw data
+        if debug:
+            return jsonify({
+                "success": True,
+                "debug": True,
+                "raw_data": data,
+                "data_type": str(type(data)),
+                "vms_type": str(type(data.get('vms'))) if isinstance(data, dict) else "N/A"
+            })
+        
+        # Extract VMs from response
+        # Data structure: {"environment": str, "hypervisors": {"items": [...]}, "vms": {"items": [...]}}
+        vms_data = data.get('vms', {})
+        
+        # VMs are in an 'items' array
+        if isinstance(vms_data, dict) and 'items' in vms_data:
+            vm_list = vms_data['items']
+        elif isinstance(vms_data, list):
+            vm_list = vms_data
+        else:
+            vm_list = []
+        
+        # Transform to UI-friendly format
+        vms = []
+        for vm in vm_list:
+            if isinstance(vm, dict):
+                # Extract host name from path
+                host_path = vm.get("host", "N/A")
+                host_name = host_path.split('/')[-1] if '/' in host_path else host_path
+                
+                # Get memory in GB
+                mem_mb = vm.get('memMb', 0)
+                memory_str = f"{mem_mb / 1024:.1f} GB" if mem_mb else "N/A"
+                
+                vms.append({
+                    "name": vm.get("name", "N/A"),
+                    "id": vm.get("managedObjRef", vm.get("name", "N/A")),
+                    "power_state": vm.get("state", "unknown"),
+                    "hypervisor": host_name,
+                    "cpu": str(vm.get("cpus", 0)),
+                    "memory": memory_str,
+                    "guest_os": vm.get("os", "N/A"),
+                    "datacenter": environment
+                })
+        
+        return jsonify({
+            "success": True,
+            "output": {
+                "vms": vms,
+                "environment": environment,
+                "total": len(vms)
+            }
+        })
+        
+    except ImportError as e:
+        return jsonify({
+            "success": False,
+            "error": f"Dora platform not available: {str(e)}"
+        }), 500
+    except ValueError as e:
+        return jsonify({
+            "success": False,
+            "error": f"Invalid environment: {str(e)}"
+        }), 400
+    except RuntimeError as e:
+        return jsonify({
+            "success": False,
+            "error": f"Dora API error: {str(e)}"
+        }), 500
+    except Exception as e:
+        import traceback
+        print(f"Error in discover_dora: {traceback.format_exc()}")
+        return jsonify({
+            "success": False,
+            "error": f"Unexpected error: {str(e)}"
+        }), 500
+
+
+@app.route("/api/dora/environments")
+def list_dora_environments():
+    """List available Dora environments."""
+    try:
+        from chaosmonkey.platforms.dora import DoraClient
+        
+        environments = DoraClient.list_environments()
+        return jsonify({
+            "success": True,
+            "environments": environments
+        })
+    except ImportError:
+        return jsonify({
+            "success": False,
+            "error": "Dora platform not available"
+        }), 500
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/vm/power-on", methods=["POST"])
+def vm_power_on():
+    """Power on a VM using available platforms."""
+    try:
+        from chaosmonkey.config import load_settings
+        from chaosmonkey.platforms.vsphere import VSpherePlatform
+        from chaosmonkey.platforms.olvm import OLVMPlatform
+        
+        data = request.json
+        vm_name = data.get("vm_name")
+        timeout = data.get("timeout", 300)
+        
+        if not vm_name:
+            return jsonify({"success": False, "error": "vm_name required"}), 400
+        
+        settings = load_settings(None)
+        errors = []
+        
+        # Try vSphere first
+        try:
+            with VSpherePlatform(
+                server=settings.platforms.vsphere.server,
+                username=settings.platforms.vsphere.username,
+                password=settings.platforms.vsphere.password,
+                insecure=settings.platforms.vsphere.insecure
+            ) as platform:
+                platform.power_on(vm_name, timeout=timeout)
+                return jsonify({
+                    "success": True,
+                    "message": f"VM '{vm_name}' powered on via vSphere",
+                    "platform": "vsphere"
+                })
+        except Exception as e:
+            errors.append(f"vSphere: {str(e)}")
+        
+        # Try OLVM if vSphere failed
+        try:
+            with OLVMPlatform(
+                url=settings.platforms.olvm.url,
+                username=settings.platforms.olvm.username,
+                password=settings.platforms.olvm.password,
+                insecure=settings.platforms.olvm.insecure
+            ) as platform:
+                platform.power_on(vm_name, timeout=timeout)
+                return jsonify({
+                    "success": True,
+                    "message": f"VM '{vm_name}' powered on via OLVM",
+                    "platform": "olvm"
+                })
+        except Exception as e:
+            errors.append(f"OLVM: {str(e)}")
+        
+        # Both failed
+        return jsonify({
+            "success": False,
+            "error": f"Failed to power on VM on all platforms. Errors: {'; '.join(errors)}"
+        }), 500
+        
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/vm/power-off", methods=["POST"])
+def vm_power_off():
+    """Power off a VM using available platforms."""
+    try:
+        from chaosmonkey.config import load_settings
+        from chaosmonkey.platforms.vsphere import VSpherePlatform
+        from chaosmonkey.platforms.olvm import OLVMPlatform
+        
+        data = request.json
+        vm_name = data.get("vm_name")
+        graceful = data.get("graceful", True)
+        timeout = data.get("timeout", 300)
+        
+        if not vm_name:
+            return jsonify({"success": False, "error": "vm_name required"}), 400
+        
+        settings = load_settings(None)
+        errors = []
+        
+        # Try vSphere first
+        try:
+            with VSpherePlatform(
+                server=settings.platforms.vsphere.server,
+                username=settings.platforms.vsphere.username,
+                password=settings.platforms.vsphere.password,
+                insecure=settings.platforms.vsphere.insecure
+            ) as platform:
+                platform.power_off(vm_name, graceful=graceful, timeout=timeout)
+                return jsonify({
+                    "success": True,
+                    "message": f"VM '{vm_name}' powered off via vSphere (graceful={graceful})",
+                    "platform": "vsphere"
+                })
+        except Exception as e:
+            errors.append(f"vSphere: {str(e)}")
+        
+        # Try OLVM if vSphere failed
+        try:
+            with OLVMPlatform(
+                url=settings.platforms.olvm.url,
+                username=settings.platforms.olvm.username,
+                password=settings.platforms.olvm.password,
+                insecure=settings.platforms.olvm.insecure
+            ) as platform:
+                platform.power_off(vm_name, graceful=graceful, timeout=timeout)
+                return jsonify({
+                    "success": True,
+                    "message": f"VM '{vm_name}' powered off via OLVM (graceful={graceful})",
+                    "platform": "olvm"
+                })
+        except Exception as e:
+            errors.append(f"OLVM: {str(e)}")
+        
+        # Both failed
+        return jsonify({
+            "success": False,
+            "error": f"Failed to power off VM on all platforms. Errors: {'; '.join(errors)}"
+        }), 500
+        
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/vm/reboot", methods=["POST"])
+def vm_reboot():
+    """Reboot a VM using available platforms."""
+    try:
+        from chaosmonkey.config import load_settings
+        from chaosmonkey.platforms.vsphere import VSpherePlatform
+        from chaosmonkey.platforms.olvm import OLVMPlatform
+        
+        data = request.json
+        vm_name = data.get("vm_name")
+        graceful = data.get("graceful", True)
+        timeout = data.get("timeout", 300)
+        
+        if not vm_name:
+            return jsonify({"success": False, "error": "vm_name required"}), 400
+        
+        settings = load_settings(None)
+        errors = []
+        
+        # Try vSphere first
+        try:
+            with VSpherePlatform(
+                server=settings.platforms.vsphere.server,
+                username=settings.platforms.vsphere.username,
+                password=settings.platforms.vsphere.password,
+                insecure=settings.platforms.vsphere.insecure
+            ) as platform:
+                platform.reboot(vm_name, graceful=graceful, timeout=timeout)
+                return jsonify({
+                    "success": True,
+                    "message": f"VM '{vm_name}' rebooted via vSphere (graceful={graceful})",
+                    "platform": "vsphere"
+                })
+        except Exception as e:
+            errors.append(f"vSphere: {str(e)}")
+        
+        # Try OLVM if vSphere failed
+        try:
+            with OLVMPlatform(
+                url=settings.platforms.olvm.url,
+                username=settings.platforms.olvm.username,
+                password=settings.platforms.olvm.password,
+                insecure=settings.platforms.olvm.insecure
+            ) as platform:
+                platform.reboot(vm_name, graceful=graceful, timeout=timeout)
+                return jsonify({
+                    "success": True,
+                    "message": f"VM '{vm_name}' rebooted via OLVM (graceful={graceful})",
+                    "platform": "olvm"
+                })
+        except Exception as e:
+            errors.append(f"OLVM: {str(e)}")
+        
+        # Both failed
+        return jsonify({
+            "success": False,
+            "error": f"Failed to reboot VM on all platforms. Errors: {'; '.join(errors)}"
+        }), 500
+        
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/targets")
+def list_targets():
+    """List chaos experiment targets."""
+    chaos_type = request.args.get("chaos_type")
+    
+    try:
+        # Import here to avoid circular imports
+        from chaosmonkey.core.orchestrator import ChaosOrchestrator
+        from chaosmonkey.config import load_settings
+        
+        config = load_settings(None)
+        orchestrator = ChaosOrchestrator(config)
+        
+        # Get targets
+        targets = orchestrator.enumerate_targets(chaos_type=chaos_type)
+        
+        # Convert to dict format
+        targets_list = [
+            {
+                "id": target.identifier,
+                "name": target.attributes.get("name", target.identifier),
+                "kind": target.kind,
+                "node": target.attributes.get("node", "unknown"),
+                "status": target.attributes.get("status", "unknown"),
+            }
+            for target in targets
+        ]
+        
+        return jsonify({
+            "success": True,
+            "targets": targets_list,
+            "count": len(targets_list)
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
+@app.route("/api/chaos-jobs")
+def list_chaos_jobs():
+    """List active chaos jobs."""
+    status_filter = request.args.get("status")
+    cmd = ["chaosmonkey", "chaos-jobs"]
+    if status_filter:
+        cmd.extend(["--status", status_filter])
+    
+    result = run_cli_command(cmd)
+    return jsonify(result)
+
+
+@app.route("/api/execute", methods=["POST"])
+def execute_chaos():
+    """Execute a chaos experiment."""
+    data = request.json
+    
+    cmd = ["chaosmonkey", "execute"]
+    
+    if data.get("target_id"):
+        cmd.extend(["--target-id", data["target_id"]])
+    
+    if data.get("chaos_type"):
+        cmd.extend(["--chaos-type", data["chaos_type"]])
+    
+    if data.get("dry_run"):
+        cmd.append("--dry-run")
+    
+    result = run_cli_command(cmd)
+    return jsonify(result)
+
+
+@app.route("/api/node-operations")
+def list_node_operations():
+    """List all node drain/recover operations."""
+    operation_type = request.args.get("type")  # Optional filter: 'drain' or 'recover'
+    limit = int(request.args.get("limit", 100))
+    
+    operations = get_node_operations(operation_type, limit)
+    return jsonify({
+        "success": True,
+        "operations": operations,
+        "count": len(operations)
+    })
+
+
+@app.route("/api/reports")
+def list_reports():
+    """List all available reports."""
+    reports = []
+    
+    for report_file in sorted(REPORTS_DIR.glob("run-*.json"), reverse=True):
+        try:
+            with open(report_file) as f:
+                report_data = json.load(f)
+                reports.append({
+                    "run_id": report_data.get("run_id"),
+                    "chaos_type": report_data.get("chaos_type"),
+                    "status": report_data.get("status"),
+                    "started_at": report_data.get("started_at"),
+                    "completed_at": report_data.get("completed_at"),
+                    "target_id": report_data.get("target_id"),
+                    "has_markdown": (REPORTS_DIR / f"{report_file.stem}.md").exists(),
+                    "has_html": (REPORTS_DIR / f"{report_file.stem}.html").exists()
+                })
+        except Exception as e:
+            print(f"Error reading report {report_file}: {e}")
+    
+    return jsonify({"reports": reports})
+
+
+@app.route("/api/reports/<run_id>")
+def get_report(run_id):
+    """Get a specific report."""
+    report_format = request.args.get("format", "json")
+    
+    if report_format == "json":
+        report_file = REPORTS_DIR / f"{run_id}.json"
+        if report_file.exists():
+            with open(report_file) as f:
+                return jsonify(json.load(f))
+    elif report_format == "markdown":
+        report_file = REPORTS_DIR / f"{run_id}.md"
+        if report_file.exists():
+            with open(report_file) as f:
+                return jsonify({"content": f.read()})
+    elif report_format == "html":
+        report_file = REPORTS_DIR / f"{run_id}.html"
+        if report_file.exists():
+            with open(report_file) as f:
+                return jsonify({"content": f.read()})
+    
+    return jsonify({"error": "Report not found"}), 404
+
+
+@app.route("/api/chaos-types")
+def list_chaos_types():
+    """List available chaos types."""
+    # Get templates directory relative to this file
+    templates_dir = Path(__file__).parent.parent / "experiments" / "templates"
+    chaos_types = []
+    
+    if not templates_dir.exists():
+        return jsonify({"chaos_types": [], "error": f"Templates directory not found: {templates_dir}"})
+    
+    for template_file in templates_dir.glob("generic_*.json"):
+        chaos_type = template_file.stem.replace("generic_", "")
+        
+        # Read template to get description
+        try:
+            with open(template_file) as f:
+                template_data = json.load(f)
+                description = template_data.get("description", "")
+        except Exception as e:
+            description = f"Error reading template: {e}"
+        
+        chaos_types.append({
+            "name": chaos_type,
+            "display_name": chaos_type.replace("_", " ").title(),
+            "description": description,
+            "icon": get_chaos_icon(chaos_type)
+        })
+    
+    return jsonify({"chaos_types": chaos_types})
+
+
+def get_chaos_icon(chaos_type: str) -> str:
+    """Get emoji icon for chaos type."""
+    icons = {
+        "cpu_hog": "🔥",
+        "memory_hog": "💾",
+        "network_latency": "🐌",
+        "packet_loss": "📦",
+        "host_down": "💀",
+        "disk_io": "💿"
+    }
+    return icons.get(chaos_type, "⚡")
+
+
+@app.route("/api/node/drain", methods=["POST"])
+def drain_node_endpoint():
+    """Drain a Nomad node using NomadClient."""
+    from ..core.nomad import NomadClient
+    from ..config import load_settings
+    
+    data = request.json
+    node_id = data.get("node_id")
+    deadline = data.get("deadline", 300)  # Default 300 seconds
+    
+    if not node_id:
+        return jsonify({"error": "node_id is required"}), 400
+    
+    try:
+        # Load settings and initialize NomadClient
+        settings = load_settings(None)
+        client = NomadClient(
+            address=settings.nomad.address,
+            region=settings.nomad.region,
+            token=settings.nomad.token,
+            namespace=settings.nomad.namespace
+        )
+        
+        # Clean the node_id (remove "..." if present)
+        clean_node_id = node_id.split("...")[0] if "..." in node_id else node_id
+        
+        # Use NomadClient's drain_node method
+        success = client.drain_node(clean_node_id, deadline_seconds=deadline)
+        
+        if success:
+            # Log the operation
+            node_name = data.get("node_name", clean_node_id[:8])
+            log_node_operation("drain", clean_node_id, node_name, {
+                "success": True,
+                "deadline_seconds": deadline
+            })
+            
+            # Invalidate cache after draining
+            invalidate_cache("nomad:clients:all")
+            
+            return jsonify({
+                "success": True,
+                "message": f"Node {clean_node_id} drain initiated successfully"
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Failed to drain node"
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/node/batch-drain", methods=["POST"])
+def batch_drain_nodes_endpoint():
+    """Drain multiple Nomad nodes as a single batch operation."""
+    from ..core.nomad import NomadClient
+    from ..config import load_settings
+    
+    data = request.json
+    node_ids = data.get("node_ids", [])
+    deadline = data.get("deadline", 300)
+    
+    if not node_ids or not isinstance(node_ids, list):
+        return jsonify({"error": "node_ids array is required"}), 400
+    
+    try:
+        settings = load_settings(None)
+        client = NomadClient(
+            address=settings.nomad.address,
+            region=settings.nomad.region,
+            token=settings.nomad.token,
+            namespace=settings.nomad.namespace
+        )
+        
+        results = []
+        for node_info in node_ids:
+            node_id = node_info.get("id")
+            node_name = node_info.get("name", node_id[:8] if node_id else "unknown")
+            clean_node_id = node_id.split("...")[0] if "..." in node_id else node_id
+            
+            try:
+                success = client.drain_node(clean_node_id, deadline_seconds=deadline)
+                results.append({
+                    "node_id": clean_node_id,
+                    "node_name": node_name,
+                    "success": success
+                })
+            except Exception as e:
+                results.append({
+                    "node_id": clean_node_id,
+                    "node_name": node_name,
+                    "success": False,
+                    "error": str(e)
+                })
+        
+        # Log as a single batch operation
+        log_batch_node_operation("drain", results, {
+            "deadline_seconds": deadline,
+            "total_nodes": len(node_ids)
+        })
+        
+        invalidate_cache("nomad:clients:all")
+        
+        success_count = sum(1 for r in results if r["success"])
+        return jsonify({
+            "success": True,
+            "message": f"Batch drain completed: {success_count}/{len(results)} successful",
+            "results": results,
+            "success_count": success_count,
+            "total_count": len(results)
+        })
+            
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/node/batch-recover", methods=["POST"])
+def batch_recover_nodes_endpoint():
+    """Recover multiple Nomad nodes as a single batch operation."""
+    from ..core.nomad import NomadClient
+    from ..config import load_settings
+    
+    data = request.json
+    node_ids = data.get("node_ids", [])
+    
+    if not node_ids or not isinstance(node_ids, list):
+        return jsonify({"error": "node_ids array is required"}), 400
+    
+    try:
+        settings = load_settings(None)
+        client = NomadClient(
+            address=settings.nomad.address,
+            region=settings.nomad.region,
+            token=settings.nomad.token,
+            namespace=settings.nomad.namespace
+        )
+        
+        results = []
+        for node_info in node_ids:
+            node_id = node_info.get("id")
+            node_name = node_info.get("name", node_id[:8] if node_id else "unknown")
+            clean_node_id = node_id.split("...")[0] if "..." in node_id else node_id
+            
+            try:
+                success = client.recover_node(clean_node_id)
+                results.append({
+                    "node_id": clean_node_id,
+                    "node_name": node_name,
+                    "success": success
+                })
+            except Exception as e:
+                results.append({
+                    "node_id": clean_node_id,
+                    "node_name": node_name,
+                    "success": False,
+                    "error": str(e)
+                })
+        
+        # Log as a single batch operation
+        log_batch_node_operation("recover", results, {
+            "total_nodes": len(node_ids)
+        })
+        
+        invalidate_cache("nomad:clients:all")
+        
+        success_count = sum(1 for r in results if r["success"])
+        return jsonify({
+            "success": True,
+            "message": f"Batch recover completed: {success_count}/{len(results)} successful",
+            "results": results,
+            "success_count": success_count,
+            "total_count": len(results)
+        })
+            
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/node/eligibility", methods=["POST"])
+def set_node_eligibility():
+    """Enable or disable node eligibility using NomadClient."""
+    from ..core.nomad import NomadClient
+    from ..config import load_settings
+    
+    data = request.json
+    node_id = data.get("node_id")
+    enable = data.get("enable", True)
+    
+    if not node_id:
+        return jsonify({"error": "node_id is required"}), 400
+    
+    try:
+        # Load settings and initialize NomadClient
+        settings = load_settings(None)
+        client = NomadClient(
+            address=settings.nomad.address,
+            region=settings.nomad.region,
+            token=settings.nomad.token,
+            namespace=settings.nomad.namespace
+        )
+        
+        # Clean the node_id (remove "..." if present)
+        clean_node_id = node_id.split("...")[0] if "..." in node_id else node_id
+        
+        if enable:
+            # Use NomadClient's recover_node method to enable the node
+            success = client.recover_node(clean_node_id)
+            action = "enabled"
+        else:
+            # For disabling, we would need a new method or use drain
+            # For now, just return an error as the UI only uses enable=True
+            return jsonify({
+                "success": False,
+                "error": "Disabling nodes is not supported. Use drain instead."
+            }), 400
+        
+        if success:
+            # Log the operation
+            node_name = data.get("node_name", clean_node_id[:8])
+            log_node_operation("recover", clean_node_id, node_name, {
+                "success": True
+            })
+            
+            # Invalidate cache after recovery
+            invalidate_cache("nomad:clients:all")
+            
+            return jsonify({
+                "success": True,
+                "message": f"Node {clean_node_id} {action} successfully"
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": f"Failed to {action} node"
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/reports/<run_id>/html")
+def get_html_report(run_id):
+    """Get or generate HTML report for a specific run."""
+    from ..core.report_html import generate_html_report
+    
+    # Check if HTML report already exists
+    html_file = REPORTS_DIR / f"{run_id}.html"
+    if html_file.exists():
+        return send_from_directory(REPORTS_DIR, f"{run_id}.html", mimetype='text/html')
+    
+    # Generate HTML report from JSON data
+    json_file = REPORTS_DIR / f"{run_id}.json"
+    if not json_file.exists():
+        return jsonify({"error": "Report not found"}), 404
+    
+    try:
+        with open(json_file) as f:
+            report_data = json.load(f)
+        
+        experiment = report_data.get("experiment", {})
+        result = report_data.get("result", {})
+        
+        # Generate enhanced HTML report
+        html_content = generate_html_report(run_id, experiment, result)
+        
+        # Save for future use
+        html_file.write_text(html_content)
+        
+        # Return HTML directly
+        from flask import Response
+        return Response(html_content, mimetype='text/html')
+        
+    except Exception as e:
+        return jsonify({"error": f"Failed to generate HTML report: {str(e)}"}), 500
+
+
+@app.route("/api/reports/<run_id>/download")
+def download_report(run_id):
+    """Download report in specified format (html or pdf)."""
+    format_type = request.args.get("format", "html").lower()
+    
+    if format_type == "html":
+        html_file = REPORTS_DIR / f"{run_id}.html"
+        
+        # Generate if doesn't exist
+        if not html_file.exists():
+            from ..core.report_html import generate_html_report
+            json_file = REPORTS_DIR / f"{run_id}.json"
+            
+            if not json_file.exists():
+                return jsonify({"error": "Report not found"}), 404
+            
+            try:
+                with open(json_file) as f:
+                    report_data = json.load(f)
+                
+                experiment = report_data.get("experiment", {})
+                result = report_data.get("result", {})
+                html_content = generate_html_report(run_id, experiment, result)
+                html_file.write_text(html_content)
+            except Exception as e:
+                return jsonify({"error": f"Failed to generate HTML: {str(e)}"}), 500
+        
+        return send_from_directory(
+            REPORTS_DIR, 
+            f"{run_id}.html",
+            as_attachment=True,
+            download_name=f"chaos-report-{run_id}.html"
+        )
+    
+    elif format_type == "pdf":
+        from ..core.report_pdf import is_pdf_generation_available, generate_pdf_from_html
+        from flask import Response
+        
+        if not is_pdf_generation_available():
+            return jsonify({
+                "error": "PDF generation not available. WeasyPrint is not installed."
+            }), 503
+        
+        # Get or generate HTML first
+        html_file = REPORTS_DIR / f"{run_id}.html"
+        
+        if not html_file.exists():
+            from ..core.report_html import generate_html_report
+            json_file = REPORTS_DIR / f"{run_id}.json"
+            
+            if not json_file.exists():
+                return jsonify({"error": "Report not found"}), 404
+            
+            try:
+                with open(json_file) as f:
+                    report_data = json.load(f)
+                
+                experiment = report_data.get("experiment", {})
+                result = report_data.get("result", {})
+                html_content = generate_html_report(run_id, experiment, result)
+                html_file.write_text(html_content)
+            except Exception as e:
+                return jsonify({"error": f"Failed to generate HTML: {str(e)}"}), 500
+        
+        try:
+            # Generate PDF from HTML
+            html_content = html_file.read_text()
+            pdf_bytes = generate_pdf_from_html(html_content)
+            
+            return Response(
+                pdf_bytes,
+                mimetype='application/pdf',
+                headers={
+                    'Content-Disposition': f'attachment; filename=chaos-report-{run_id}.pdf'
+                }
+            )
+        except Exception as e:
+            return jsonify({"error": f"Failed to generate PDF: {str(e)}"}), 500
+    
+    else:
+        return jsonify({"error": "Invalid format. Use 'html' or 'pdf'"}), 400
+
+
+@app.route("/reports/<path:filename>")
+def serve_report(filename):
+    """Serve report files directly."""
+    return send_from_directory(REPORTS_DIR, filename)
+
+
+@app.route("/api/cache/clear", methods=["POST"])
+def clear_cache():
+    """Clear Redis cache."""
+    pattern = request.json.get("pattern", "*") if request.json else "*"
+    
+    if not cache.enabled:
+        return jsonify({
+            "success": False,
+            "message": "Cache is not enabled"
+        })
+    
+    count = invalidate_cache(pattern)
+    return jsonify({
+        "success": True,
+        "message": f"Cleared {count} cache entries",
+        "count": count
+    })
+
+
+@app.route("/api/cache/stats")
+def cache_stats():
+    """Get cache statistics."""
+    if not cache.enabled:
+        return jsonify({
+            "enabled": False,
+            "message": "Cache is not enabled"
+        })
+    
+    try:
+        # Get cache info
+        info = cache._client.info("stats")
+        keyspace = cache._client.info("keyspace")
+        
+        return jsonify({
+            "enabled": True,
+            "stats": {
+                "total_commands_processed": info.get("total_commands_processed", 0),
+                "keyspace_hits": info.get("keyspace_hits", 0),
+                "keyspace_misses": info.get("keyspace_misses", 0),
+                "keys": keyspace
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            "enabled": True,
+            "error": str(e)
+        })
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8080, debug=True)

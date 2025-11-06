@@ -1,0 +1,26 @@
+{
+  "version": "1.0.0",
+  "title": "CPU hog template",
+  "description": "Placeholder experiment that schedules a CPU intensive workload alongside the target.",
+  "tags": ["cpu-hog"],
+  "steady-state-hypothesis": {
+    "title": "Critical service remains responsive",
+    "probes": []
+  },
+  "method": [
+    {
+      "type": "action",
+      "name": "Run CPU stress job",
+      "provider": {
+        "type": "python",
+        "module": "chaosmonkey.stubs.actions",
+        "func": "run_cpu_stress",
+        "arguments": {
+          "service_id": "${target_id}",
+          "duration": "${duration_seconds}"
+        }
+      }
+    }
+  ],
+  "rollbacks": []
+}

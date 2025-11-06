@@ -1,0 +1,175 @@
+DEBUG:chaosmonkey.config:Loaded NOMAD_ADDR: http://nomad-dev-fqdn:4646
+DEBUG:chaosmonkey.config:Loaded NOMAD_TOKEN: 73820208-811b-3b2e-22ab-569cfd572cc5
+DEBUG:chaosmonkey.config:Loaded NOMAD_REGION: 
+DEBUG:chaosmonkey.config:Loaded NOMAD_NAMESPACE: default
+✅ Redis cache connected: redis://localhost:6379/0
+🔍 Effective OLVM URL: None
+🚀 Starting ChaosMonkey Web UI...
+📊 Dashboard: http://0.0.0.0:8081
+🔑 Make sure NOMAD_ADDR and NOMAD_TOKEN are set in your environment
+⏹️  Press Ctrl+C to stop
+
+ * Serving Flask app 'chaosmonkey.web.app'
+ * Debug mode: off
+INFO:werkzeug:[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8081
+ * Running on http://172.16.13.141:8081
+INFO:werkzeug:[33mPress CTRL+C to quit[0m
+INFO:werkzeug:127.0.0.1 - - [09/Oct/2025 23:56:21] "GET / HTTP/1.1" 200 -
+Exception in thread Thread-2 (updater):
+Traceback (most recent call last):
+  File "/usr/local/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+    self.run()
+  File "/usr/local/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/threading.py", line 1010, in run
+    self._target(*self._args, **self._kwargs)
+  File "/Users/rajaviswanathan/bitbucket-2021/chaosmonkey/src/chaosmonkey/web/app.py", line 204, in updater
+    while _dora_updater_running:
+          ^^^^^^^^^^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable '_dora_updater_running' where it is not associated with a value
+DEBUG:urllib3.connectionpool:Starting new HTTP connection (1): nomad-dev-fqdn:4646
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/jobs?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:Starting new HTTP connection (1): nomad-dev-fqdn:4646
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/allocations?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:Starting new HTTP connection (1): nomad-dev-fqdn:4646
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/cadvisor?namespace=default HTTP/1.1" 200 1343
+DEBUG:urllib3.connectionpool:Starting new HTTP connection (1): nomad-dev-fqdn:4646
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/7b4aeb81-cb23-d741-7ecc-3147b452c07f?namespace=default HTTP/1.1" 200 1967
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/consul-proxy?namespace=default HTTP/1.1" 200 1434
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/654fcf04-2cf1-ab1a-9202-0c1537e81826?namespace=default HTTP/1.1" 200 1959
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/fluentd?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/git2consul-job?namespace=default HTTP/1.1" 200 1332
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/d8d8cc2a-65e4-803a-0ed5-5980b9a90b29?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-client-connect-web-job?namespace=default HTTP/1.1" 200 1877
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/76add458-3bc4-fcc1-c596-1249a6a51103?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-gitea-job?namespace=default HTTP/1.1" 200 1621
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/d8d8cc2a-65e4-803a-0ed5-5980b9a90b29?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-account-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/538b4367-c20d-cdc7-2a73-6e59e245d5dc?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-ads-config-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/994324d2-55ac-0c83-55de-4023f7d3e44d?namespace=default HTTP/1.1" 200 1971
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-aggregator-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/76add458-3bc4-fcc1-c596-1249a6a51103?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-api-gateway-envoy-job?namespace=default HTTP/1.1" 200 1974
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/a7ebbf46-e690-6916-45df-6281530d70f3?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-api-gateway-xds-server-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/a7ebbf46-e690-6916-45df-6281530d70f3?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-api-partner-portal-job?namespace=default HTTP/1.1" 200 1945
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/85f68369-b8f8-deb6-58f3-f4009bc1b238?namespace=default HTTP/1.1" 200 2015
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-api-portal-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/85f68369-b8f8-deb6-58f3-f4009bc1b238?namespace=default HTTP/1.1" 200 2017
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-auth-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/e434f0d6-ee27-f511-cf13-9cdb4d27544e?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-batch-tve-export-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/976a5473-8c6f-ff6d-fefd-43c965c6cc31?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-blackout-adapter-logger-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/1da9f0fa-1b3e-2e3c-e806-40a4cc4c475b?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-blackout-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/1da9f0fa-1b3e-2e3c-e806-40a4cc4c475b?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-catalog-export-pcd-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-ccms-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/b02dc717-ebaf-cf7a-9081-3e8bd2a25ef9?namespace=default HTTP/1.1" 200 1966
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-client-purchase-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/976a5473-8c6f-ff6d-fefd-43c965c6cc31?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-config-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/994324d2-55ac-0c83-55de-4023f7d3e44d?namespace=default HTTP/1.1" 200 1970
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-consul-consul-sync-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-device-management-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/e434f0d6-ee27-f511-cf13-9cdb4d27544e?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-dtf-processor-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/976a5473-8c6f-ff6d-fefd-43c965c6cc31?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-eas-gateway-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/308fdf66-c017-8599-0d37-4e2f8673e27c?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-envoy-authz-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/e434f0d6-ee27-f511-cf13-9cdb4d27544e?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-fips-code-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/538b4367-c20d-cdc7-2a73-6e59e245d5dc?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-generic-billing-adapter-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/8b4786ce-1c26-9081-61ed-d9e0c03c15d3?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-geoip-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/538b4367-c20d-cdc7-2a73-6e59e245d5dc?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-google-assistant-proxy-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/994324d2-55ac-0c83-55de-4023f7d3e44d?namespace=default HTTP/1.1" 200 1962
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-guide-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/13b3c90c-bf1c-399c-0a48-f15c36537312?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-idam-amservice-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/538b4367-c20d-cdc7-2a73-6e59e245d5dc?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-idam-imservice-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/538b4367-c20d-cdc7-2a73-6e59e245d5dc?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-image-resize-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/5cb3b29f-8ab2-a003-7184-658bb4ea2a80?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-notification-purchase-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/976a5473-8c6f-ff6d-fefd-43c965c6cc31?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-offer-admin-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/a4f766ef-cd07-40b6-e097-85b38bdfe412?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-offer-client-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/a4f766ef-cd07-40b6-e097-85b38bdfe412?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-pcd-recommendation-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/13b3c90c-bf1c-399c-0a48-f15c36537312?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-policy-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/bb178236-9c16-5ad9-8d0a-c38f53a19360?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-purchase-adapter-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/976a5473-8c6f-ff6d-fefd-43c965c6cc31?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-queue-forwarder-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/baae3871-820f-16b9-bcc4-6277c0844b9c?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-recents-cleaner-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/baae3871-820f-16b9-bcc4-6277c0844b9c?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-recents-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/baae3871-820f-16b9-bcc4-6277c0844b9c?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-recording-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/baae3871-820f-16b9-bcc4-6277c0844b9c?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-rights-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/538b4367-c20d-cdc7-2a73-6e59e245d5dc?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-solr-publisher-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/a23b0b1c-6a18-bc66-e8e4-3fb4dd6a76c4?namespace=default HTTP/1.1" 200 2033
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-stream-counter-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/654fcf04-2cf1-ab1a-9202-0c1537e81826?namespace=default HTTP/1.1" 200 1971
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-url-signing-validation-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/e434f0d6-ee27-f511-cf13-9cdb4d27544e?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-user-preferences-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/baae3871-820f-16b9-bcc4-6277c0844b9c?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-platform-vid-service-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/994324d2-55ac-0c83-55de-4023f7d3e44d?namespace=default HTTP/1.1" 200 1972
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-tools-automation-job?namespace=default HTTP/1.1" 200 2009
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-tools-idm-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-tools-must-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/mobi-varnish6-config-msvar-job?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/a7ebbf46-e690-6916-45df-6281530d70f3?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/job/vector?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:Starting new HTTP connection (1): nomad-dev-fqdn:4646
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/nodes HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/09555425-9f96-1555-abf9-bdad45e8231a?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/13b3c90c-bf1c-399c-0a48-f15c36537312?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/13f8663e-c348-846d-b516-cb8531eee6fe?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/1da9f0fa-1b3e-2e3c-e806-40a4cc4c475b?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/213b0771-8c92-332d-00f4-0f38c061ea37?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/28dad89b-89c0-c518-70e8-46611d65fefd?namespace=default HTTP/1.1" 200 1952
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/2b80ed88-11f0-3fa0-8024-38c67529881f?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/2cae1501-af89-662e-e7bc-deba52f9ee53?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/308fdf66-c017-8599-0d37-4e2f8673e27c?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/4f84c536-ccbe-9f1a-198b-505531752a84?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/538b4367-c20d-cdc7-2a73-6e59e245d5dc?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/5cb3b29f-8ab2-a003-7184-658bb4ea2a80?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/654fcf04-2cf1-ab1a-9202-0c1537e81826?namespace=default HTTP/1.1" 200 1967
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/675fec38-7a77-186a-a875-343b8299ea64?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/725adda2-0e7d-b57d-540e-de1046fcd848?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/76add458-3bc4-fcc1-c596-1249a6a51103?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/7b380684-ea98-1f15-0e92-155f838d257d?namespace=default HTTP/1.1" 200 2016
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/7b4aeb81-cb23-d741-7ecc-3147b452c07f?namespace=default HTTP/1.1" 200 1972
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/85f68369-b8f8-deb6-58f3-f4009bc1b238?namespace=default HTTP/1.1" 200 2019
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/8b4786ce-1c26-9081-61ed-d9e0c03c15d3?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/976a5473-8c6f-ff6d-fefd-43c965c6cc31?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/994324d2-55ac-0c83-55de-4023f7d3e44d?namespace=default HTTP/1.1" 200 1968
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/9c20b014-8494-daad-b7c7-627fe675ed6d?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/9d31d728-0c3f-0d5a-c0d1-15cb17498029?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/a23b0b1c-6a18-bc66-e8e4-3fb4dd6a76c4?namespace=default HTTP/1.1" 200 2026
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/a4f766ef-cd07-40b6-e097-85b38bdfe412?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/a7ebbf46-e690-6916-45df-6281530d70f3?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/b02dc717-ebaf-cf7a-9081-3e8bd2a25ef9?namespace=default HTTP/1.1" 200 1955
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/baae3871-820f-16b9-bcc4-6277c0844b9c?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/bb178236-9c16-5ad9-8d0a-c38f53a19360?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/d774c7c3-f9c5-e80e-5c85-d5286b6754ee?namespace=default HTTP/1.1" 200 2021
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/d8d8cc2a-65e4-803a-0ed5-5980b9a90b29?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/e434f0d6-ee27-f511-cf13-9cdb4d27544e?namespace=default HTTP/1.1" 200 None
+DEBUG:urllib3.connectionpool:http://nomad-dev-fqdn:4646 "GET /v1/node/ffb6e227-4fdc-94aa-5439-678709042c9d?namespace=default HTTP/1.1" 200 None
+INFO:werkzeug:127.0.0.1 - - [09/Oct/2025 23:56:43] "GET /api/targets HTTP/1.1" 200 -

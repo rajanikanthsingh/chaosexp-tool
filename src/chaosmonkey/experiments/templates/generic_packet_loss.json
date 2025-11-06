@@ -1,0 +1,26 @@
+{
+  "version": "1.0.0",
+  "title": "Packet loss template",
+  "description": "Placeholder experiment introducing packet loss via Nomad job.",
+  "tags": ["packet-loss"],
+  "steady-state-hypothesis": {
+    "title": "Service error rate stays acceptable",
+    "probes": []
+  },
+  "method": [
+    {
+      "type": "action",
+      "name": "Inject packet loss",
+      "provider": {
+        "type": "python",
+        "module": "chaosmonkey.stubs.actions",
+        "func": "inject_packet_loss",
+        "arguments": {
+          "service_id": "${target_id}",
+          "packet_loss": "${packet_loss_percentage}"
+        }
+      }
+    }
+  ],
+  "rollbacks": []
+}

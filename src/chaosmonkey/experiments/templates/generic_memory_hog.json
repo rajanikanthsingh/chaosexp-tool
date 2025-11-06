@@ -1,0 +1,27 @@
+{
+  "version": "1.0.0",
+  "title": "Memory hog template",
+  "description": "Experiment that consumes memory on the target node to create memory pressure.",
+  "tags": ["memory-hog"],
+  "steady-state-hypothesis": {
+    "title": "Service continues operating under memory pressure",
+    "probes": []
+  },
+  "method": [
+    {
+      "type": "action",
+      "name": "Run memory stress job",
+      "provider": {
+        "type": "python",
+        "module": "chaosmonkey.stubs.actions",
+        "func": "run_memory_stress",
+        "arguments": {
+          "service_id": "${target_id}",
+          "duration": "${duration_seconds}",
+          "memory_mb": "${memory_mb}"
+        }
+      }
+    }
+  ],
+  "rollbacks": []
+}

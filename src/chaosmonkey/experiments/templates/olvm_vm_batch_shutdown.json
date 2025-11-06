@@ -1,0 +1,33 @@
+{
+  "version": "1.0.0",
+  "title": "OLVM Batch VM Shutdown",
+  "description": "Power off multiple VMs on OLVM/oVirt in parallel to simulate cascading failure",
+  "tags": ["vm", "olvm", "batch", "power-off", "infrastructure"],
+  "steady-state-hypothesis": {
+    "title": "Services continue responding after batch VM shutdown",
+    "probes": []
+  },
+  "method": [
+    {
+      "type": "action",
+      "name": "Batch shutdown VMs on OLVM",
+      "provider": {
+        "type": "python",
+        "module": "chaosmonkey.stubs.actions",
+        "func": "vm_batch_power_off",
+        "arguments": {
+          "vm_names": "${vm_names}",
+          "platform_type": "olvm",
+          "graceful": "${graceful}",
+          "parallel": "${parallel}",
+          "timeout": "${timeout}",
+          "url": "${olvm_url}",
+          "username": "${olvm_username}",
+          "password": "${olvm_password}",
+          "insecure": "${olvm_insecure}"
+        }
+      }
+    }
+  ],
+  "rollbacks": []
+}

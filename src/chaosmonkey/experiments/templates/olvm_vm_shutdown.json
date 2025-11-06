@@ -1,0 +1,50 @@
+{
+  "version": "1.0.0",
+  "title": "OLVM VM Shutdown",
+  "description": "Power off a VM on OLVM/oVirt platform to simulate infrastructure failure",
+  "tags": ["vm", "olvm", "power-off", "infrastructure"],
+  "steady-state-hypothesis": {
+    "title": "Service continues responding after VM shutdown",
+    "probes": []
+  },
+  "method": [
+    {
+      "type": "action",
+      "name": "Shutdown VM on OLVM",
+      "provider": {
+        "type": "python",
+        "module": "chaosmonkey.stubs.actions",
+        "func": "vm_power_off",
+        "arguments": {
+          "vm_name": "${vm_name}",
+          "platform_type": "olvm",
+          "graceful": "${graceful}",
+          "timeout": "${timeout}",
+          "url": "${olvm_url}",
+          "username": "${olvm_username}",
+          "password": "${olvm_password}",
+          "insecure": "${olvm_insecure}"
+        }
+      }
+    }
+  ],
+  "rollbacks": [
+    {
+      "type": "action",
+      "name": "Power on VM",
+      "provider": {
+        "type": "python",
+        "module": "chaosmonkey.stubs.actions",
+        "func": "vm_power_on",
+        "arguments": {
+          "vm_name": "${vm_name}",
+          "platform_type": "olvm",
+          "url": "${olvm_url}",
+          "username": "${olvm_username}",
+          "password": "${olvm_password}",
+          "insecure": "${olvm_insecure}"
+        }
+      }
+    }
+  ]
+}

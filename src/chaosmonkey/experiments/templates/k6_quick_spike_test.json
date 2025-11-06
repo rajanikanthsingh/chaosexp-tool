@@ -1,0 +1,36 @@
+{
+  "version": "1.0.0",
+  "title": "k6 Quick Spike Test",
+  "description": "Run k6 spike testing with shorter duration for development",
+  "tags": ["spike-test", "k6", "quick"],
+  "steady-state-hypothesis": {
+    "title": "System survives traffic spikes",
+    "probes": []
+  },
+  "method": [
+    {
+      "type": "action",
+      "name": "run-k6-quick-spike-test",
+      "provider": {
+        "type": "python",
+        "module": "chaosmonkey.stubs.actions",
+        "func": "run_k6_script",
+        "arguments": {
+          "script_text": "import http from 'k6/http';\nimport { check } from 'k6';\n\nexport default function() {\n  let response = http.get('${target_url}');\n  check(response, {\n    'status is 200 or similar': (r) => r.status >= 200 && r.status < 500,\n    'response time < 1000ms': (r) => r.timings.duration < 1000,\n  });\n}",
+          "options": {
+            "stages": [
+              { "duration": "15s", "target": 5 },
+              { "duration": "10s", "target": 25 },
+              { "duration": "15s", "target": 5 }
+            ],
+            "thresholds": {
+              "http_req_failed": ["rate<0.2"],
+              "http_req_duration": ["p(95)<1000"]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "rollbacks": []
+}

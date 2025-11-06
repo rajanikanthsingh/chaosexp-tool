@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "title": "k6 Database Connection Test",
+  "description": "Test database-backed services under load with connection pooling validation",
+  "tags": ["database-test", "k6", "connections"],
+  "steady-state-hypothesis": {
+    "title": "Database connections remain stable under load",
+    "probes": []
+  },
+  "method": [
+    {
+      "type": "action",
+      "name": "run-database-load-test",
+      "provider": {
+        "type": "python",
+        "module": "chaosmonkey.stubs.actions",
+        "func": "run_k6_script",
+        "arguments": {
+          "script_text": "import http from 'k6/http';\nimport { check, sleep } from 'k6';\nimport { Counter, Trend } from 'k6/metrics';\n\n// Custom metrics for database operations\nlet dbErrors = new Counter('database_errors');\nlet dbConnectionTime = new Trend('db_connection_time');\nlet dbQueryTime = new Trend('db_query_time');\n\nexport let options = {\n  stages: [\n    { duration: '30s', target: ${ramp_up_users} },\n    { duration: '${duration_seconds}s', target: ${virtual_users} },\n    { duration: '30s', target: 0 },\n  ],\n  thresholds: {\n    'http_req_duration': ['p(95)<${response_time_threshold}'],\n    'http_req_failed': ['rate<0.05'],\n    'database_errors': ['count<10'],\n  },\n};\n\nexport default function() {\n  // Test database read operations\n  let readResponse = http.get('${target_url}/api/v1/users?limit=10');\n  let readSuccess = check(readResponse, {\n    'read operation succeeds': (r) => r.status === 200,\n    'read response time OK': (r) => r.timings.duration < ${response_time_threshold},\n    'read returns data': (r) => JSON.parse(r.body).length > 0,\n  });\n  \n  if (readSuccess) {\n    dbQueryTime.add(readResponse.timings.duration);\n  } else {\n    dbErrors.add(1);\n  }\n  \n  // Test database write operations (lighter load)\n  if (__VU % 5 === 0) {  // Only 20% of users do writes\n    let writePayload = JSON.stringify({\n      name: `TestUser${__VU}`,\n      timestamp: new Date().toISOString()\n    });\n    \n    let writeResponse = http.post('${target_url}/api/v1/users', writePayload, {\n      headers: { 'Content-Type': 'application/json' },\n    });\n    \n    check(writeResponse, {\n      'write operation succeeds': (r) => r.status >= 200 && r.status < 300,\n      'write response time OK': (r) => r.timings.duration < ${response_time_threshold} * 2,\n    }) || dbErrors.add(1);\n  }\n  \n  sleep(1 + Math.random() * 2);  // Random sleep 1-3s\n}",
+          "options": {
+            "thresholds": {
+              "http_req_failed": ["rate<0.05"],
+              "http_req_duration": ["p(95)<${response_time_threshold}"],
+              "database_errors": ["count<10"]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "rollbacks": []
+}
